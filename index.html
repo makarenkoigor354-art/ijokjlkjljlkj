@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Shibuya Sushi — Витрина</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --ink:#15161B;
+    --ink-2:#1D1F26;
+    --washi:#F1E9D8;
+    --washi-2:#E8DDC6;
+    --ume:#B23A48;
+    --ume-2:#8F2C38;
+    --matcha:#7C9473;
+    --gold:#C9A227;
+    --text-warm:#EDE6D6;
+    --text-ink:#221D17;
+    --text-muted:#9A9184;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--ink);
+    color:var(--text-warm);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:92px;
+  }
+  .brush-rule{
+    height:3px;
+    background:linear-gradient(90deg, transparent, var(--gold) 15%, var(--gold) 85%, transparent);
+    opacity:.55;
+  }
+  header.top{
+    position:sticky; top:0; z-index:30;
+    background:linear-gradient(180deg, var(--ink) 70%, rgba(21,22,27,0));
+    padding:18px 18px 10px;
+  }
+  .brand-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .brand{
+    display:flex; flex-direction:column; line-height:1;
+  }
+  .brand .kanji{
+    font-family:'PT Serif', serif; font-weight:700; font-size:11px;
+    letter-spacing:.14em; color:var(--gold); margin-bottom:4px;
+  }
+  .brand .name{
+    font-family:'PT Serif', serif; font-weight:700; font-size:26px; color:var(--text-warm);
+  }
+  .badges{display:flex; gap:6px;}
+  .badge{
+    font-size:12px; padding:6px 10px; border-radius:999px;
+    background:var(--ink-2); border:1px solid rgba(201,162,39,.35);
+    color:var(--text-warm); white-space:nowrap;
+  }
+  .badge.hot{border-color:var(--ume); color:#F3C9CD;}
+
+  nav.tabs{
+    display:flex; gap:8px; margin-top:16px;
+  }
+  .tab-btn{
+    flex:1; padding:11px 6px; border-radius:12px; border:none;
+    background:var(--ink-2); color:var(--text-muted); font-family:'Inter';
+    font-weight:600; font-size:14px; cursor:pointer; transition:background .2s, color .2s;
+  }
+  .tab-btn.active{background:var(--washi); color:var(--text-ink);}
+
+  .chips{
+    display:flex; gap:8px; overflow-x:auto; padding:14px 18px 4px;
+    scrollbar-width:none;
+  }
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:0 0 auto; padding:9px 14px; border-radius:999px; font-size:13px; font-weight:600;
+    background:var(--ink-2); color:var(--text-muted); border:1px solid transparent; cursor:pointer;
+    white-space:nowrap;
+  }
+  .chip.active{background:rgba(178,58,72,.18); border-color:var(--ume); color:#F3C9CD;}
+
+  main{padding:6px 18px 0;}
+  .section-title{
+    font-family:'PT Serif', serif; font-size:19px; color:var(--text-warm);
+    margin:22px 2px 12px; display:flex; align-items:baseline; gap:8px;
+  }
+  .section-title span.count{font-family:'Inter'; font-size:12px; color:var(--text-muted);}
+
+  .dish{
+    display:flex; gap:14px; background:var(--washi); border-radius:18px;
+    padding:12px; margin-bottom:12px; align-items:center;
+    box-shadow:0 6px 18px rgba(0,0,0,.25);
+  }
+  .dish-photo{
+    width:74px; height:74px; border-radius:14px; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center; font-size:30px;
+    background:var(--photo-bg, linear-gradient(135deg,#7C9473,#4F6B49));
+    color:#fff;
+    position:relative; overflow:hidden;
+  }
+  .dish-photo::after{
+    content:""; position:absolute; inset:0;
+    background:radial-gradient(circle at 30% 20%, rgba(255,255,255,.35), transparent 55%);
+  }
+  .dish-info{flex:1; min-width:0;}
+  .dish-name{
+    font-weight:700; font-size:14.5px; color:var(--text-ink); line-height:1.25;
+  }
+  .dish-sub{font-size:12px; color:#8A7F6E; margin-top:3px;}
+  .dish-right{display:flex; flex-direction:column; align-items:flex-end; gap:8px;}
+  .dish-price{font-weight:800; font-size:15px; color:var(--ume-2);}
+  .add-btn{
+    width:32px; height:32px; border-radius:50%; border:none; background:var(--ume);
+    color:#fff; font-size:18px; line-height:1; cursor:pointer;
+  }
+  .add-btn:active{background:var(--ume-2);}
+
+  /* Delivery tab */
+  #map{
+    width:100%; height:340px; border-radius:18px; margin-top:14px; overflow:hidden;
+    border:1px solid rgba(201,162,39,.3);
+  }
+  .zone-list{margin-top:16px; display:flex; flex-direction:column; gap:8px;}
+  .zone-row{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--ink-2); padding:11px 14px; border-radius:12px; font-size:13px;
+  }
+  .zone-row .city{font-weight:600; color:var(--text-warm);}
+  .zone-row .plz{color:var(--text-muted); font-size:12px; margin-left:6px;}
+  .zone-row .fee{color:var(--gold); font-weight:700;}
+
+  .hint{
+    font-size:12.5px; color:var(--text-muted); text-align:center; margin:18px 6px 4px; line-height:1.5;
+  }
+
+  footer.cartbar{
+    position:fixed; left:14px; right:14px; bottom:14px; z-index:40;
+    background:var(--ume); border-radius:18px; padding:14px 18px;
+    display:flex; align-items:center; justify-content:space-between;
+    box-shadow:0 10px 30px rgba(178,58,72,.45);
+    transform:translateY(120%); transition:transform .25s ease;
+  }
+  footer.cartbar.visible{transform:translateY(0);}
+  .cart-info{color:#fff;}
+  .cart-info .count{font-size:12px; opacity:.85;}
+  .cart-info .total{font-size:17px; font-weight:800;}
+  .checkout-btn{
+    background:#fff; color:var(--ume-2); border:none; border-radius:12px;
+    padding:11px 18px; font-weight:700; font-size:14px; cursor:pointer;
+  }
+
+  .leaflet-popup-content-wrapper{background:var(--washi); color:var(--text-ink); border-radius:12px;}
+  .leaflet-popup-tip{background:var(--washi);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand-row">
+    <div class="brand">
+      <span class="kanji">渋谷寿司 · GÜTERSLOH</span>
+      <span class="name">Shibuya Sushi</span>
+    </div>
+    <div class="badges">
+      <div class="badge hot">🔥 3 нед. подряд</div>
+      <div class="badge">🎰 приз ждёт</div>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="menu">🍣 Меню</button>
+    <button class="tab-btn" data-tab="delivery">🗺️ Доставка</button>
+  </nav>
+</header>
+
+<div class="brush-rule"></div>
+
+<div id="tab-menu">
+  <div class="chips" id="chips"></div>
+  <main id="menu-sections"></main>
+  <p class="hint">Нажмите «＋», чтобы добавить блюдо в заказ.<br>Не можете выбрать? В боте есть команда /surprise 🎲</p>
+</div>
+
+<div id="tab-delivery" style="display:none;">
+  <main>
+    <div class="section-title">Зоны доставки</div>
+    <div id="map"></div>
+    <div class="zone-list" id="zone-list"></div>
+    <p class="hint">Стоимость и минимальная сумма заказа зависят от почтового индекса.<br>Вне отмеченных зон — доставка уточняется отдельно.</p>
+  </main>
+</div>
+
+<footer class="cartbar" id="cartbar">
+  <div class="cart-info">
+    <div class="count" id="cart-count">0 позиций</div>
+    <div class="total" id="cart-total">0€</div>
+  </div>
+  <button class="checkout-btn" id="checkout-btn">Отправить в бот →</button>
+</footer>
+
+<script>
+// ---------------------------------------------------------------------
+// Данные меню (синхронизированы с MENU в bot.py — обновляйте оба места)
+// ---------------------------------------------------------------------
+const MENU = {
+  sets:        { title: "Sets / Сеты", emoji:"🍱", color:"linear-gradient(135deg,#C9A227,#8F7318)",
+                 items: [["Big Set Hot / Биг сет хот",135],["Big Set / Биг Сет",115]] },
+  baked:       { title: "Запечённые роллы", emoji:"🔥", color:"linear-gradient(135deg,#B23A48,#7A2530)",
+                 items: [["Ролл Киев",16],["Ролл Днепр",14],["Ролл Харьков",14],
+                          ["С курицей и сыром",14],["С креветкой и лососем",16],
+                          ["С тунцом",13],["С креветками",13],["С лососем",14]] },
+  tempura:     { title: "Темпура роллы", emoji:"🍤", color:"linear-gradient(135deg,#D98A3D,#A15F22)",
+                 items: [["Темпура креветка",13],["Темпура лосось",13],["Темпура тунец",13]] },
+  philadelphia:{ title: "Philadelphia", emoji:"🥑", color:"linear-gradient(135deg,#7C9473,#4F6B49)",
+                 items: [["С лососем и огурцом",12],["С лососем и авокадо",14],
+                          ["С лососем и креветками",13],["С тунцом и огурцом",15],
+                          ["С лососем в кунжуте",13],["Два вида рыбы",15]] },
+  california:  { title: "California / Калифорния", emoji:"🥢", color:"linear-gradient(135deg,#3E7C8C,#245061)",
+                 items: [["Калифорния с креветками",12],["Калифорния классик",14],["Калифорния Хиаши",10]] },
+  maki_burger: { title: "Maki & Sushi-Burger", emoji:"🍔", color:"linear-gradient(135deg,#8C5E3E,#5C3C24)",
+                 items: [["Маки с креветками",6],["Маки с тунцом",6],["Маки с огурцом",4],
+                          ["Суши-бургер с креветками",15],["Рыбный бургер",15],
+                          ["Запечённый суши-бургер с лососем",15],["Крабсбургер",15]] },
+};
+
+const DELIVERY_ZONES = [
+  {plz:"33378", city:"Rheda-Wiedenbrück", min:20,  fee:2.0, lat:51.8464, lng:8.2999},
+  {plz:"33442", city:"Herzebrock-Clarholz", min:20,  fee:5.0, lat:51.8836, lng:8.2394},
+  {plz:"33330", city:"Gütersloh (центр)",  min:35,  fee:5.0, lat:51.9067, lng:8.3819},
+  {plz:"33332", city:"Gütersloh",          min:100, fee:5.0, lat:51.9200, lng:8.3600},
+  {plz:"33334", city:"Gütersloh",          min:100, fee:5.0, lat:51.8950, lng:8.4050},
+  {plz:"33397", city:"Rietberg",           min:35,  fee:5.0, lat:51.8058, lng:8.4109},
+  {plz:"33449", city:"Langenberg",         min:20,  fee:5.0, lat:51.8974, lng:8.3773},
+  {plz:"59329", city:"Wadersloh",          min:35,  fee:5.0, lat:51.7167, lng:8.2667},
+  {plz:"33428", city:"Harsewinkel",        min:55,  fee:5.0, lat:51.9575, lng:8.2323},
+  {plz:"59302", city:"Oelde",              min:50,  fee:5.0, lat:51.8272, lng:8.1489},
+  {plz:"48361", city:"Beelen",             min:35,  fee:5.0, lat:51.9328, lng:8.1264},
+  {plz:"33415", city:"Verl",               min:50,  fee:7.0, lat:51.8780, lng:8.5081},
+  {plz:"33602", city:"Bielefeld",          min:65,  fee:7.0, lat:52.0302, lng:8.5325},
+  {plz:"33129", city:"Delbrück",           min:100, fee:7.0, lat:51.7667, lng:8.5667},
+  {plz:"59269", city:"Beckum",             min:65,  fee:7.0, lat:51.7511, lng:8.0417},
+  {plz:"48231", city:"Warendorf",          min:65,  fee:7.0, lat:51.9506, lng:7.9853},
+  {plz:"59320", city:"Ennigerloh",         min:65,  fee:7.0, lat:51.8347, lng:8.0333},
+];
+const RESTAURANT = {lat:51.9067, lng:8.3819, name:"Shibuya Sushi"};
+
+// ---------------------------------------------------------------------
+// Telegram WebApp
+// ---------------------------------------------------------------------
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); }
+
+// ---------------------------------------------------------------------
+// Рендер меню
+// ---------------------------------------------------------------------
+let cart = [];
+
+function renderChips(){
+  const chips = document.getElementById("chips");
+  chips.innerHTML = "";
+  Object.entries(MENU).forEach(([key, cat], i)=>{
+    const chip = document.createElement("button");
+    chip.className = "chip" + (i===0 ? " active" : "");
+    chip.textContent = cat.emoji + " " + cat.title;
+    chip.onclick = ()=>{
+      document.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
+      chip.classList.add("active");
+      document.getElementById("cat-"+key).scrollIntoView({behavior:"smooth", block:"start"});
+    };
+    chips.appendChild(chip);
+  });
+}
+
+function renderMenu(){
+  const wrap = document.getElementById("menu-sections");
+  wrap.innerHTML = "";
+  Object.entries(MENU).forEach(([key, cat])=>{
+    const section = document.createElement("div");
+    section.id = "cat-"+key;
+    const title = document.createElement("div");
+    title.className = "section-title";
+    title.innerHTML = cat.emoji + " " + cat.title + ` <span class="count">${cat.items.length} позиций</span>`;
+    section.appendChild(title);
+
+    cat.items.forEach(([name, price], idx)=>{
+      const dish = document.createElement("div");
+      dish.className = "dish";
+      dish.innerHTML = `
+        <div class="dish-photo" style="--photo-bg:${cat.color}">${cat.emoji}</div>
+        <div class="dish-info">
+          <div class="dish-name">${name}</div>
+          <div class="dish-sub">${cat.title}</div>
+        </div>
+        <div class="dish-right">
+          <div class="dish-price">${price}€</div>
+          <button class="add-btn">＋</button>
+        </div>`;
+      dish.querySelector(".add-btn").onclick = ()=> addToCart(name, price);
+      section.appendChild(dish);
+    });
+    wrap.appendChild(section);
+  });
+}
+
+function addToCart(name, price){
+  cart.push({name, price});
+  if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+  updateCartBar();
+}
+
+function updateCartBar(){
+  const bar = document.getElementById("cartbar");
+  const total = cart.reduce((s,i)=>s+i.price,0);
+  document.getElementById("cart-count").textContent = cart.length + " позиций";
+  document.getElementById("cart-total").textContent = total + "€";
+  bar.classList.toggle("visible", cart.length>0);
+}
+
+document.getElementById("checkout-btn").onclick = ()=>{
+  const payload = JSON.stringify({action:"webapp_cart", items:cart});
+  if (tg) {
+    tg.sendData(payload);
+  } else {
+    alert("Демо-режим (вне Telegram): корзина отправилась бы в бот:\\n" + payload);
+  }
+};
+
+// ---------------------------------------------------------------------
+// Вкладки
+// ---------------------------------------------------------------------
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const tab = btn.dataset.tab;
+    document.getElementById("tab-menu").style.display = tab==="menu" ? "block" : "none";
+    document.getElementById("tab-delivery").style.display = tab==="delivery" ? "block" : "none";
+    if (tab === "delivery") setTimeout(()=>{ if(window._map) window._map.invalidateSize(); }, 50);
+  };
+});
+
+// ---------------------------------------------------------------------
+// Карта доставки
+// ---------------------------------------------------------------------
+function renderMap(){
+  const map = L.map('map', {zoomControl:false}).setView([RESTAURANT.lat, RESTAURANT.lng], 10);
+  window._map = map;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© OpenStreetMap', maxZoom:18
+  }).addTo(map);
+
+  L.marker([RESTAURANT.lat, RESTAURANT.lng], {
+    icon: L.divIcon({className:'', html:'<div style="background:#B23A48;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.4)">🍣</div>', iconSize:[26,26]})
+  }).addTo(map).bindPopup(`<b>${RESTAURANT.name}</b><br>Кухня и точка выдачи заказов`);
+
+  DELIVERY_ZONES.forEach(z=>{
+    const radius = 1600 + z.fee*300;
+    L.circle([z.lat, z.lng], {radius, color:"#C9A227", weight:1, fillColor:"#C9A227", fillOpacity:.12})
+      .addTo(map)
+      .bindPopup(`<b>${z.city}</b> (${z.plz})<br>Мин. заказ: ${z.min}€<br>Доставка: ${z.fee.toFixed(2)}€`);
+  });
+}
+
+function renderZoneList(){
+  const list = document.getElementById("zone-list");
+  DELIVERY_ZONES.forEach(z=>{
+    const row = document.createElement("div");
+    row.className = "zone-row";
+    row.innerHTML = `<div><span class="city">${z.city}</span><span class="plz">${z.plz}</span></div>
+                      <div>от ${z.min}€ · <span class="fee">${z.fee.toFixed(2)}€</span></div>`;
+    list.appendChild(row);
+  });
+}
+
+renderChips();
+renderMenu();
+renderZoneList();
+renderMap();
+</script>
+</body>
+</html>
